@@ -1,4 +1,6 @@
-﻿import { useRef, useState } from "react";
+﻿
+import { useEffect, useRef, useState } from "react";
+
 import {
   Activity,
   ArrowRight,
@@ -16,13 +18,86 @@ import { predictDigit } from "../services/knnPredict";
 import { preprocessCanvas } from "../services/preprocessCanvas";
 import { savePrediction } from "../services/history";
 
+// Displays an actual 28 x 28 MNIST training image
+function NeighborThumbnail({ pixels }) {
+  const thumbnailRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = thumbnailRef.current;
+
+    if (!canvas || !pixels || pixels.length !== 784) return;
+
+    const context = canvas.getContext("2d");
+    const imageData = context.createImageData(28, 28);
+
+    for (let i = 0; i < 784; i++) {
+      const value = pixels[i];
+      const offset = i * 4;
+
+      imageData.data[offset] = value;
+      imageData.data[offset + 1] = value;
+      imageData.data[offset + 2] = value;
+      imageData.data[offset + 3] = 255;
+    }
+
+    context.putImageData(imageData, 0, 0);
+  }, [pixels]);
+
+  return (
+    <canvas
+      ref={thumbnailRef}
+      width={28}
+      height={28}
+      className="neighbor-thumbnail"
+      aria-label="MNIST neighbour image"
+    />
+  );
+}
+
+
+function ProcessedImagePreview({ pixels }) {
+  const previewRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = previewRef.current;
+
+    if (!canvas || !pixels || pixels.length !== 784) return;
+
+    const context = canvas.getContext("2d");
+    const imageData = context.createImageData(28, 28);
+
+    for (let i = 0; i < 784; i++) {
+      const value = pixels[i];
+      const offset = i * 4;
+
+      imageData.data[offset] = value;
+      imageData.data[offset + 1] = value;
+      imageData.data[offset + 2] = value;
+      imageData.data[offset + 3] = 255;
+    }
+
+    context.putImageData(imageData, 0, 0);
+  }, [pixels]);
+
+  return (
+    <canvas
+      ref={previewRef}
+      width={28}
+      height={28}
+      className="processed-preview-canvas"
+      aria-label="Preprocessed 28 by 28 MNIST image"
+    />
+  );
+}
+
 export default function Recognition() {
   const canvasRef = useRef(null);
   const datasetRef = useRef(null);
 
   const [result, setResult] = useState(null);
-  const [predicting, setPredicting] = useState(false);
-  const [message, setMessage] = useState("");
+const [predicting, setPredicting] = useState(false);
+const [message, setMessage] = useState("");
+const [processedPixels, setProcessedPixels] = useState(null);
 
   async function handlePrediction() {
     if (!canvasRef.current?.hasDrawing()) {
@@ -49,39 +124,41 @@ export default function Recognition() {
 
       // Convert drawing into 28 x 28 grayscale pixels
       const inputPixels = preprocessCanvas(canvas);
-
+    setProcessedPixels(inputPixels);
       // Run real KNN classification
       const prediction = predictDigit(
         inputPixels,
         datasetRef.current,
         5
       );
-      console.log(
-  "KNN nearest neighbors:",
-  prediction.neighbors.map((neighbor, index) => ({
-    rank: index + 1,
-    digit: neighbor.label,
-    distance: Math.round(neighbor.distance),
-  }))
-);
 
-      
+      console.log(
+        "KNN nearest neighbors:",
+        prediction.neighbors.map((neighbor, index) => ({
+          rank: index + 1,
+          digit: neighbor.label,
+          distance: Math.sqrt(neighbor.distance).toFixed(2),
+        }))
+      );
 
       const resultData = {
         digit: prediction.predictedDigit,
         votes: prediction.votes,
+        neighbors: prediction.neighbors,
         mode: "knn",
         k: prediction.k,
       };
 
       // Save the actual prediction in History
       const record = {
-        id: Date.now(),
-        digit: resultData.digit,
-        votes: resultData.votes,
-        mode: "knn",
-        createdAt: new Date().toISOString(),
-      };
+  id: Date.now(),
+  digit: resultData.digit,
+  votes: resultData.votes,
+  image: Array.from(inputPixels),
+  mode: "knn",
+  k: prediction.k,
+  createdAt: new Date().toISOString(),
+};
 
       savePrediction(record);
 
@@ -89,6 +166,7 @@ export default function Recognition() {
       setMessage("");
     } catch (error) {
       console.error("KNN prediction error:", error);
+
       setMessage(
         error.message || "Prediction failed. Please try again."
       );
@@ -98,15 +176,18 @@ export default function Recognition() {
   }
 
   function handleClear() {
+    
     canvasRef.current?.clear();
     setResult(null);
     setMessage("");
+    setProcessedPixels(null);
   }
 
   function handleUndo() {
     canvasRef.current?.undo();
     setResult(null);
     setMessage("");
+    setProcessedPixels(null);
   }
 
   const sortedVotes = result
@@ -122,9 +203,11 @@ export default function Recognition() {
           <div className="eyebrow">
             <span className="eyebrow-dot" /> INTERACTIVE LAB
           </div>
+
           <h1>
             Recognition <span>Studio</span>
           </h1>
+
           <p>
             Draw a handwritten digit and let the real KNN classifier
             recognize it.
@@ -138,7 +221,36 @@ export default function Recognition() {
 
       <div className="recognition-layout">
         <section className="recognition-main">
-          <DrawingCanvas ref={canvasRef} />
+
+
+<div className="drawing-preview-layout">
+  <DrawingCanvas ref={canvasRef} />
+
+  <div className="processed-preview-card">
+    <div className="processed-preview-heading">
+      <h3>Preprocessed image</h3>
+      <span>28 × 28 PIXELS</span>
+    </div>
+
+    {processedPixels ? (
+      <>
+        <div className="processed-preview-stage">
+          <ProcessedImagePreview pixels={processedPixels} />
+        </div>
+
+        <p className="processed-preview-caption">
+          Centered grayscale image used by the KNN classifier.
+        </p>
+      </>
+    ) : (
+      <div className="processed-preview-empty">
+        <Fingerprint size={25} />
+        <strong>Preview unavailable</strong>
+        <span>Draw a digit and click Predict Digit.</span>
+      </div>
+    )}
+  </div>
+</div>
 
           {message && (
             <div className="recognition-message">
@@ -171,61 +283,108 @@ export default function Recognition() {
                 <h3>Prediction result</h3>
                 <p>Your KNN classification output</p>
               </div>
+
               <span className="result-demo-tag">REAL KNN</span>
             </div>
 
             {predicting ? (
               <div className="result-empty">
                 <div className="loading-spinner large-spinner" />
+
                 <strong>Analyzing your handwriting</strong>
+
                 <span>
                   Comparing your drawing with MNIST training examples.
                 </span>
               </div>
             ) : result ? (
-              <div className="result-content">
-                <div className="result-digit">
-                  <span>Predicted digit</span>
-                  <strong>{result.digit}</strong>
-                  <small>Actual KNN prediction</small>
-                </div>
-
-                <div className="result-votes">
-                  <div className="vote-title">
-                    <strong>Nearest-neighbor votes</strong>
-                    <span>{result.k} neighbors</span>
+              <>
+                {/* Prediction and voting results */}
+                <div className="result-content">
+                  <div className="result-digit">
+                    <span>Predicted digit</span>
+                    <strong>{result.digit}</strong>
+                    <small>Actual KNN prediction</small>
                   </div>
 
-                  {sortedVotes.map((vote) => (
-                    <div className="vote-row" key={vote.digit}>
-                      <span className="vote-digit">
-                        {vote.digit}
-                      </span>
-
-                      <div className="vote-track">
-                        <div
-                          className={`vote-fill ${
-                            vote.digit === result.digit ? "winner" : ""
-                          }`}
-                          style={{
-                            width: `${vote.percentage}%`,
-                          }}
-                        />
-                      </div>
-
-                      <span className="vote-value">
-                        {Math.round(vote.percentage)}%
-                      </span>
+                  <div className="result-votes">
+                    <div className="vote-title">
+                      <strong>Nearest-neighbor votes</strong>
+                      <span>{result.k} neighbors</span>
                     </div>
-                  ))}
+
+                    {sortedVotes.map((vote) => (
+                      <div className="vote-row" key={vote.digit}>
+                        <span className="vote-digit">
+                          {vote.digit}
+                        </span>
+
+                        <div className="vote-track">
+                          <div
+                            className={`vote-fill ${
+                              vote.digit === result.digit
+                                ? "winner"
+                                : ""
+                            }`}
+                            style={{
+                              width: `${vote.percentage}%`,
+                            }}
+                          />
+                        </div>
+
+                        <span className="vote-value">
+                          {Math.round(vote.percentage)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                {/* Full-width nearest-neighbor gallery */}
+                <div className="neighbor-gallery">
+                  <div className="neighbor-gallery-heading">
+                    <strong>
+                      Actual 5 nearest MNIST neighbours
+                    </strong>
+
+                    <span>
+                      Closest training examples
+                    </span>
+                  </div>
+
+                  <div className="neighbor-grid">
+                    {result.neighbors.map((neighbor, index) => (
+                      <div
+                        className="neighbor-item"
+                        key={`${neighbor.index}-${index}`}
+                      >
+                        <NeighborThumbnail pixels={neighbor.image} />
+
+                        <strong>
+                          Digit {neighbor.label}
+                        </strong>
+
+                        <span>
+                          #{index + 1} neighbour
+                        </span>
+
+                        <small>
+                          Distance:{" "}
+                          {Math.sqrt(neighbor.distance).toFixed(2)}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="result-empty">
                 <div className="result-empty-icon">
                   <Fingerprint size={25} />
                 </div>
+
                 <strong>No prediction yet</strong>
+
                 <span>
                   Draw a digit and select Predict Digit to classify it
                   using KNN.
@@ -246,14 +405,18 @@ export default function Recognition() {
             <div className="guide-steps">
               <div className="guide-step">
                 <span>01</span>
+
                 <div>
                   <strong>Draw a digit</strong>
-                  <p>Write one number from 0 to 9 on the canvas.</p>
+                  <p>
+                    Write one number from 0 to 9 on the canvas.
+                  </p>
                 </div>
               </div>
 
               <div className="guide-step">
                 <span>02</span>
+
                 <div>
                   <strong>Run prediction</strong>
                   <p>
@@ -265,6 +428,7 @@ export default function Recognition() {
 
               <div className="guide-step">
                 <span>03</span>
+
                 <div>
                   <strong>Explore the output</strong>
                   <p>
@@ -295,14 +459,17 @@ export default function Recognition() {
                 <span>Learning type</span>
                 <strong>Supervised</strong>
               </div>
+
               <div>
                 <span>Training examples</span>
                 <strong>5,000</strong>
               </div>
+
               <div>
                 <span>K value</span>
                 <strong>5</strong>
               </div>
+
               <div>
                 <span>Classification</span>
                 <strong>Majority voting</strong>
@@ -317,6 +484,7 @@ export default function Recognition() {
 
             <div>
               <strong>Drawing tip</strong>
+
               <p>
                 Use a single bold digit, keep it near the center,
                 and avoid drawing multiple numbers together.
@@ -328,6 +496,7 @@ export default function Recognition() {
 
       <div className="disclaimer recognition-disclaimer">
         <CheckCircle2 size={15} />
+
         Predictions are generated locally using the KNN algorithm
         and MNIST training data. Results may vary depending on
         handwriting and preprocessing.

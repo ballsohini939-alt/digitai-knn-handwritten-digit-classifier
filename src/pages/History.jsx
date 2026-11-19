@@ -1,6 +1,5 @@
 
-import { useEffect, useState } from "react";
-import {
+import { useEffect, useRef, useState } from "react";import {
   History as HistoryIcon,
   Trash2,
   Clock3,
@@ -16,6 +15,44 @@ import {
   deletePrediction,
   clearPredictionHistory,
 } from "../services/history";
+
+function HistoryThumbnail({ pixels }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+
+    if (!canvas || !pixels || pixels.length !== 784) return;
+
+    const context = canvas.getContext("2d");
+    const imageData = context.createImageData(28, 28);
+
+    for (let i = 0; i < 784; i++) {
+      const value = pixels[i];
+      const offset = i * 4;
+
+      imageData.data[offset] = value;
+      imageData.data[offset + 1] = value;
+      imageData.data[offset + 2] = value;
+      imageData.data[offset + 3] = 255;
+    }
+
+    context.putImageData(imageData, 0, 0);
+  }, [pixels]);
+
+  if (!pixels || pixels.length !== 784) {
+    return <div className="history-thumbnail-placeholder">—</div>;
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={28}
+      height={28}
+      className="history-thumbnail-canvas"
+    />
+  );
+}
 
 export default function History() {
   const [records, setRecords] = useState([]);
@@ -54,7 +91,7 @@ export default function History() {
             <span className="eyebrow-dot" /> PREDICTION RECORDS
           </div>
           <h1>Prediction <span>History</span></h1>
-          <p>Review and manage your previous digit recognition demonstrations.</p>
+<p>Review and manage your saved handwritten digit predictions.</p>
         </div>
 
         {records.length > 0 && (
@@ -81,8 +118,15 @@ export default function History() {
           <div className="history-stat-icon"><Sparkles size={18} /></div>
           <div>
             <span>Prediction mode</span>
-            <strong>Demo</strong>
-          </div>
+<strong>
+  {records.length === 0
+    ? "—"
+    : records.every((item) => item.mode === "knn")
+      ? "Real KNN"
+      : records.some((item) => item.mode === "knn")
+        ? "Mixed"
+        : "Demo"}
+</strong>          </div>
         </article>
 
         <article className="history-stat-card">
@@ -98,7 +142,7 @@ export default function History() {
         <div className="history-list-heading">
           <div>
             <h3>Recent predictions</h3>
-            <p>Your saved demonstration activity</p>
+<p>Your saved recognition activity</p>
           </div>
           <span className="history-count">{records.length} RECORDS</span>
         </div>
@@ -111,7 +155,7 @@ export default function History() {
             <h3>No prediction history yet</h3>
             <p>
               Your predictions will appear here after you draw a digit
-              and run a demonstration in Recognition Studio.
+and run a KNN prediction in Recognition Studio.
             </p>
             <a href="/recognition" className="history-start-link">
               Open Recognition Studio <span>→</span>
@@ -134,10 +178,14 @@ export default function History() {
                 {records.map((record, index) => (
                   <tr key={record.id}>
                     <td>
-                      <span className="history-index">
-                        #{String(records.length - index).padStart(3, "0")}
-                      </span>
-                    </td>
+  <div className="history-prediction-cell">
+    <HistoryThumbnail pixels={record.image} />
+
+    <span className="history-index">
+      #{String(records.length - index).padStart(3, "0")}
+    </span>
+  </div>
+</td>
 
                     <td>
                       <span className="history-digit">
@@ -153,11 +201,15 @@ export default function History() {
                     </td>
 
                     <td>
-                      <span className="history-mode">
-                        <span />
-                        Demo
-                      </span>
-                    </td>
+  <span
+    className={`history-mode ${
+      record.mode === "knn" ? "knn-mode" : "demo-mode"
+    }`}
+  >
+    <span />
+    {record.mode === "knn" ? "REAL KNN" : "DEMO"}
+  </span>
+</td>
 
                     <td>
                       <button
@@ -178,10 +230,10 @@ export default function History() {
       </section>
 
       <div className="history-disclaimer">
-        <AlertTriangle size={15} />
-        These records contain simulated demo predictions, not results from
-        a trained KNN model.
-      </div>
+  <AlertTriangle size={15} />
+  New records store the processed 28×28 image and KNN prediction details
+  in this browser. Older records may not include image thumbnails.
+</div>
 
       {showConfirm && (
         <div className="history-modal-overlay">
@@ -190,7 +242,7 @@ export default function History() {
             <h3>Clear prediction history?</h3>
             <p>
               This will permanently delete all {records.length} saved
-              demonstration records from this browser.
+prediction records from this browser.
             </p>
 
             <div className="history-modal-actions">

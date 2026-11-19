@@ -2105,3 +2105,221 @@ h1, h2, h3, p { margin-top: 0; }
   .about-final-card { padding: 22px 16px; }
   .about-final-card h2 { font-size: 17px; }
 }
+/* =========================================
+   KNN NEAREST NEIGHBOR GALLERY
+========================================= */
+
+.neighbor-gallery {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.neighbor-gallery-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.neighbor-gallery-heading strong {
+  color: #d5d0e1;
+  font-size: 11px;
+}
+
+.neighbor-gallery-heading span {
+  color: #777387;
+  font-size: 9px;
+}
+
+.neighbor-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.neighbor-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #1c1928;
+  text-align: center;
+}
+
+.neighbor-thumbnail {
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  border: 1px solid #51466b;
+  border-radius: 6px;
+  background: #08070d;
+}
+
+.neighbor-item strong {
+  color: #d7c9ff;
+  font-size: 10px;
+}
+
+.neighbor-item span {
+  color: #8b879b;
+  font-size: 8px;
+}
+
+.neighbor-item small {
+  color: #a99bc9;
+  font-size: 8px;
+}
+
+@media (max-width: 600px) {
+  .neighbor-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* =========================================
+   PREPROCESSED IMAGE PREVIEW
+========================================= */
+
+.drawing-preview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.8fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.processed-preview-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #171622, #13121c);
+  display: flex;
+  flex-direction: column;
+}
+
+.processed-preview-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.processed-preview-heading h3 {
+  margin: 0;
+  color: #e4def2;
+  font-size: 12px;
+}
+
+.processed-preview-heading span {
+  color: #a78bfa;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.processed-preview-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.processed-preview-canvas {
+  width: min(100%, 150px);
+  height: auto;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  border: 1px solid #51466b;
+  border-radius: 9px;
+  background: #000;
+}
+
+.processed-preview-caption {
+  margin: 8px 0 0;
+  color: #938da2;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.processed-preview-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 180px;
+  text-align: center;
+  color: #8b7aaa;
+}
+
+.processed-preview-empty strong {
+  color: #d5d0e1;
+  font-size: 11px;
+}
+
+.processed-preview-empty span {
+  color: #777387;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .drawing-preview-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   HISTORY THUMBNAILS & KNN MODE
+========================================= */
+
+.history-prediction-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-thumbnail-canvas {
+  width: 42px;
+  height: 42px;
+  padding: 5px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #100d1d;
+  border: 1px solid #a78bfa40;
+  border-radius: 9px;
+}
+
+.history-thumbnail-placeholder {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: #858195;
+  background: #ffffff08;
+  border: 1px dashed #ffffff25;
+  border-radius: 9px;
+}
+
+.history-mode.knn-mode {
+  color: #a7f3d0;
+  background: #10b98112;
+}
+
+.history-mode.knn-mode span {
+  background: #34d399;
+}
+
+.history-mode.demo-mode {
+  color: #c4b5fd;
+  background: #a78bfa12;
+}
+
+.history-mode.demo-mode span {
+  background: #a78bfa;
+}

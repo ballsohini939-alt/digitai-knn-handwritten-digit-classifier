@@ -18,9 +18,11 @@ export function predictDigit(inputPixels, dataset, k = 5) {
     }
 
     distances.push({
-      distance,
-      label: labels[i],
-    });
+  distance,
+  label: labels[i],
+  image: images.slice(offset, offset + 784),
+  index: i,
+});
   }
 
   // Sort by distance and select the nearest k images
