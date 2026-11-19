@@ -96,6 +96,7 @@ export default function Recognition() {
 
   const [result, setResult] = useState(null);
 const [predicting, setPredicting] = useState(false);
+const [kValue, setKValue] = useState(5);
 const [message, setMessage] = useState("");
 const [processedPixels, setProcessedPixels] = useState(null);
 
@@ -126,11 +127,11 @@ const [processedPixels, setProcessedPixels] = useState(null);
       const inputPixels = preprocessCanvas(canvas);
     setProcessedPixels(inputPixels);
       // Run real KNN classification
-      const prediction = predictDigit(
-        inputPixels,
-        datasetRef.current,
-        5
-      );
+     const prediction = predictDigit(
+  inputPixels,
+  datasetRef.current,
+  kValue
+);
 
       console.log(
         "KNN nearest neighbors:",
@@ -221,6 +222,39 @@ const [processedPixels, setProcessedPixels] = useState(null);
 
       <div className="recognition-layout">
         <section className="recognition-main">
+            <div className="k-selector-card">
+  <div className="k-selector-heading">
+    <div>
+      <h3>Choose K value</h3>
+      <p>Select how many nearest neighbors the model should compare.</p>
+    </div>
+
+    <span className="k-selected-badge">K = {kValue}</span>
+  </div>
+
+  <div className="k-selector-options">
+    {[1, 3, 5, 7, 9].map((value) => (
+      <button
+        key={value}
+        type="button"
+        className={`k-option ${kValue === value ? "active" : ""}`}
+        onClick={() => {
+          setKValue(value);
+          setResult(null);
+        }}
+        disabled={predicting}
+      >
+        {value}
+      </button>
+    ))}
+  </div>
+
+  <p className="k-selector-hint">
+    {kValue === 1
+      ? "Uses only the single closest training example."
+      : `Uses the ${kValue} closest training examples and majority voting.`}
+  </p>
+</div>
 
 
 <div className="drawing-preview-layout">
@@ -344,8 +378,7 @@ const [processedPixels, setProcessedPixels] = useState(null);
                 <div className="neighbor-gallery">
                   <div className="neighbor-gallery-heading">
                     <strong>
-                      Actual 5 nearest MNIST neighbours
-                    </strong>
+Actual {result.k} nearest MNIST neighbours                    </strong>
 
                     <span>
                       Closest training examples
@@ -466,9 +499,9 @@ const [processedPixels, setProcessedPixels] = useState(null);
               </div>
 
               <div>
-                <span>K value</span>
-                <strong>5</strong>
-              </div>
+  <span>K value</span>
+  <strong>{kValue}</strong>
+</div>
 
               <div>
                 <span>Classification</span>
