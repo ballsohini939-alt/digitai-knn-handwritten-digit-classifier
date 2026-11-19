@@ -121,3 +121,5 @@ The required MNIST dataset files are included in the `public/mnist/` directory.
 **DigitAI — Handwritten Digit Classification**
 
 Built as a learning project exploring machine learning, image preprocessing and frontend development.
+# digitai-knn-handwritten-digit-classifier
+Handwritten Digit Classification using KNN, React and the MNIST dataset.
