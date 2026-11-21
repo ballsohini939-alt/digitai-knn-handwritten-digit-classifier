@@ -1,125 +1,192 @@
-# DigitAI — Handwritten Digit Classification using KNN
+# DigitAI — Handwritten Digit Classification Using KNN
 
-DigitAI is a web-based handwritten digit recognition application built with React and JavaScript. It uses the **K-Nearest Neighbors (KNN)** algorithm to classify handwritten digits from 0 to 9 using the MNIST dataset.
+<p align="center">
+  <strong>An interactive handwritten digit recognition application powered by the K-Nearest Neighbors algorithm and the MNIST dataset.</strong>
+</p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" />
+  <img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black" />
+  <img src="https://img.shields.io/badge/Vite-Build%20Tool-646CFF?logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/Machine%20Learning-KNN-purple" />
+  <img src="https://img.shields.io/badge/Accuracy-93.27%25-success" />
+</p>
 
-- Draw handwritten digits on an interactive canvas.
-- Recognize digits from 0 to 9 using a real KNN classifier.
-- Preprocess drawings into 28 × 28 grayscale images.
-- Center handwritten digits using center-of-mass alignment.
-- Evaluate the classifier using the independent MNIST test dataset.
-- View accuracy, precision, recall and F1-score.
-- Explore the 10 × 10 confusion matrix and digit distribution.
-- Save evaluation results in browser local storage.
+<p align="center">
+  <a href="https://digitai-knn-handwritten-digit-class.vercel.app/"><strong>🚀 Live Demo</strong></a> ·
+  <a href="https://github.com/ballsohini939-alt/digitai-knn-handwritten-digit-classifier"><strong>GitHub Repository</strong></a>
+</p>
 
-## Machine Learning Details
+---
+
+## 📌 Overview
+
+**DigitAI** is a web-based handwritten digit recognition application built using React and JavaScript. It implements the **K-Nearest Neighbors (KNN)** algorithm to recognize handwritten digits from 0 to 9 using the MNIST dataset.
+
+The application transforms handwritten drawings into 28 × 28 pixel images, processes them, and predicts the corresponding digit using a browser-based KNN classifier.
+
+It also provides model evaluation tools to explore classification performance through accuracy, precision, recall, F1-score, confusion matrix and digit distribution.
+
+## ✨ Features
+
+- **Interactive Drawing Canvas** — Draw handwritten digits directly in the browser.
+- **Digit Recognition** — Classify handwritten digits from 0 to 9.
+- **Live Camera Mode** — Capture handwritten digits using a camera.
+- **Image Preprocessing** — Convert drawings into 28 × 28 grayscale images.
+- **Center-of-Mass Alignment** — Center digits for improved classification.
+- **Expression Recognition** — Experiment with handwritten arithmetic expressions and operator detection.
+- **Model Evaluation** — Evaluate performance using the independent MNIST test dataset.
+- **Performance Metrics** — View accuracy, precision, recall and F1-score.
+- **Confusion Matrix** — Explore classification results across all ten digits.
+- **Evaluation History** — Save evaluation results using browser local storage.
+
+## 🧠 Machine Learning Details
+
+DigitAI uses a supervised machine learning approach based on the K-Nearest Neighbors algorithm.
 
 | Parameter | Configuration |
 |---|---|
 | Algorithm | K-Nearest Neighbors (KNN) |
-| Learning type | Supervised learning |
-| Distance metric | Euclidean distance |
-| Number of neighbors | K = 5 |
-| Voting method | Majority voting |
-| Input dimensions | 784 pixels (28 × 28) |
-| Training examples | 5,000 |
-| Test examples | 10,000 |
+| Learning Type | Supervised Learning |
+| Distance Metric | Euclidean Distance |
+| Number of Neighbors | K = 5 |
+| Voting Method | Majority Voting |
+| Input Dimensions | 784 pixels (28 × 28) |
+| Training Examples | 5,000 |
+| Test Examples | 10,000 |
+| Dataset | MNIST |
 
-### Model Performance
+### 📊 Model Performance
 
-**Measured test accuracy: 93.27%**
+**Measured Test Accuracy: 93.27%**
 
-- Correct predictions: 9,327
-- Total test images: 10,000
-- Training examples: 5,000
+| Metric | Result |
+|---|---:|
+| Correct Predictions | 9,327 |
+| Total Test Images | 10,000 |
+| Training Examples | 5,000 |
+| Test Accuracy | 93.27% |
 
-The training subset contains 500 selected examples per digit. The evaluation uses the separate MNIST test dataset.
+The training subset contains 500 selected examples per digit. Model evaluation uses the separate MNIST test dataset.
 
-## Technology Stack
+## 🛠️ Technology Stack
 
-- React
-- JavaScript
-- Vite
-- Recharts
-- Lucide React
-- HTML5 Canvas
-- MNIST dataset
+| Technology | Purpose |
+|---|---|
+| React | User interface |
+| JavaScript | Application logic |
+| Vite | Development and build tool |
+| Recharts | Data visualization |
+| Lucide React | Interface icons |
+| HTML5 Canvas | Drawing and image processing |
+| MNIST | Handwritten digit dataset |
+| CSS3 | Responsive interface styling |
 
-## Project Structure
+## 📂 Project Structure
 
 ```text
 digitai-knn-handwritten-digit-classifier/
+│
 ├── public/
 │   └── mnist/
 │       ├── train-images-idx3-ubyte.gz
 │       ├── train-labels-idx1-ubyte.gz
 │       ├── t10k-images-idx3-ubyte.gz
 │       └── t10k-labels-idx1-ubyte.gz
+│
 ├── src/
 │   ├── components/
 │   ├── pages/
-│   └── services/
+│   ├── services/
+│   ├── App.jsx
+│   └── index.css
+│
 ├── index.html
 ├── package.json
 ├── package-lock.json
 └── vite.config.js
 ```
 
-## Getting Started
+## 🚀 Getting Started
+
+Follow these instructions to run DigitAI locally.
 
 ### Prerequisites
 
 - Node.js
 - npm
+- Git
 
-### Installation
-
-Clone the repository:
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/ballsohini939-alt/digitai-knn-handwritten-digit-classifier.git
 ```
 
-Navigate into the project directory:
+### 2. Navigate to the Project Directory
 
 ```bash
 cd digitai-knn-handwritten-digit-classifier
 ```
 
-Install dependencies:
+### 3. Install Dependencies
 
 ```bash
 npm install
 ```
 
-Start the development server:
+### 4. Start the Development Server
 
 ```bash
 npm run dev
 ```
 
-Open the local URL displayed in your terminal.
+### 5. Open the Application
 
-## Dataset
+Open the local URL displayed in your terminal, usually:
 
-This project uses the MNIST handwritten digit dataset, containing grayscale images of handwritten digits.
+```text
+http://localhost:5173/
+```
 
-Dataset information: https://yann.lecun.com/exdb/mnist/
+## 📚 Dataset
 
-The required MNIST dataset files are included in the `public/mnist/` directory.
+DigitAI uses the **MNIST handwritten digit dataset**, a widely used dataset in machine learning and image classification.
 
-## Future Improvements
+The dataset contains grayscale images of handwritten digits from 0 to 9.
 
-- Downloadable model evaluation reports.
-- Improved classification performance.
-- Additional model comparisons.
-- Deployment as a live web application.
+- Image dimensions: 28 × 28 pixels
+- Number of classes: 10
+- Training subset used: 5,000 images
+- Independent test set: 10,000 images
+
+Dataset source: [MNIST Database](https://yann.lecun.com/exdb/mnist/)
+
+The required compressed dataset files are included in the `public/mnist/` directory.
+
+## 🔮 Future Improvements
+
+- Improve handwritten digit classification accuracy.
+- Enhance arithmetic operator recognition.
+- Expand handwritten mathematical expression support.
+- Compare KNN with other machine learning algorithms.
+- Generate downloadable model evaluation reports.
+- Improve image preprocessing and recognition robustness.
+
+## 👩‍💻 Author
+
+**Sohini Ball**
+
+B.Tech Computer Science and Engineering Student  
+Interested in Software Engineering, Machine Learning and AI-powered applications.
+
+- GitHub: [@ballsohini939-alt](https://github.com/ballsohini939-alt)
+- LinkedIn: [Sohini Ball](https://linkedin.com/in/sohini-ball-698012381/)
 
 ---
 
-**DigitAI — Handwritten Digit Classification**
-
-Built as a learning project exploring machine learning, image preprocessing and frontend development.
-# digitai-knn-handwritten-digit-classifier
-Handwritten Digit Classification using KNN, React and the MNIST dataset.
+<p align="center">
+  <strong>DigitAI — Turning Handwriting into Predictions.</strong>
+  <br>
+  Built with React, JavaScript and Machine Learning.
+</p>
