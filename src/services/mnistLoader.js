@@ -1,6 +1,4 @@
 
-
-
 const IMAGE_URL = "/mnist/train-images-idx3-ubyte.gz";
 const LABEL_URL = "/mnist/train-labels-idx1-ubyte.gz";
 
@@ -19,11 +17,10 @@ export async function loadMNIST() {
         "Could not download MNIST files. Check the public/mnist folder."
       );
     }
-
-    const [imageBuffer, labelBuffer] = await Promise.all([
-      imageResponse.arrayBuffer(),
-      labelResponse.arrayBuffer(),
-    ]);
+const [imageBuffer, labelBuffer] = await Promise.all([
+  imageResponse.arrayBuffer(),
+  labelResponse.arrayBuffer(),
+]);
 
     // Decompress the files
     const imageBytes = new Uint8Array(imageBuffer);
@@ -46,7 +43,6 @@ const labelBytes = new Uint8Array(labelBuffer);
     const imageCount = imageView.getUint32(4, false);
     const rows = imageView.getUint32(8, false);
     const columns = imageView.getUint32(12, false);
-
     const labelMagic = labelView.getUint32(0, false);
     const labelCount = labelView.getUint32(4, false);
 

@@ -97,7 +97,7 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(_, ref) {
     ctx.arc(
       lastPointRef.current.x,
       lastPointRef.current.y,
-      9,
+      4,
       0,
       Math.PI * 2
     );
@@ -120,7 +120,7 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(_, ref) {
     ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
     ctx.lineTo(point.x, point.y);
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 18;
+    ctx.lineWidth = 8;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();

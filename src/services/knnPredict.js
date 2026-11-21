@@ -27,7 +27,10 @@ export function predictDigit(inputPixels, dataset, k = 5) {
 
   // Sort by distance and select the nearest k images
   distances.sort((a, b) => a.distance - b.distance);
-
+// Find the closest MNIST example for each digit
+const closestByDigit = Array.from({ length: 10 }, (_, digit) =>
+  distances.find((neighbor) => neighbor.label === digit)
+);
   const nearestNeighbors = distances.slice(0, k);
 
   // Count votes for each digit
@@ -53,9 +56,10 @@ export function predictDigit(inputPixels, dataset, k = 5) {
   }));
 
   return {
-    predictedDigit,
-    votes: voteDistribution,
-    neighbors: nearestNeighbors,
-    k,
-  };
+  predictedDigit,
+  votes: voteDistribution,
+  neighbors: nearestNeighbors,
+  closestByDigit,
+  k,
+};
 }
