@@ -23,9 +23,8 @@ const [imageBuffer, labelBuffer] = await Promise.all([
 ]);
 
     // Decompress the files
-    const imageBytes = new Uint8Array(imageBuffer);
+ const imageBytes = new Uint8Array(imageBuffer);
 const labelBytes = new Uint8Array(labelBuffer);
-
     const imageView = new DataView(
       imageBytes.buffer,
       imageBytes.byteOffset,
