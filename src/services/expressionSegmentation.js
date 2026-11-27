@@ -95,3 +95,110 @@ export function extractSymbols(canvas) {
 
   return components;
 }
+export function groupDivisionComponents(components) {
+  const used = new Set();
+  const grouped = [];
+
+  for (let i = 0; i < components.length; i++) {
+    if (used.has(i)) continue;
+
+    const bar = components[i];
+
+    // A division bar should be noticeably wider than it is tall.
+    const isHorizontalBar =
+      bar.width >= bar.height * 2.2;
+
+    if (!isHorizontalBar) continue;
+
+    const centerX = bar.x + bar.width / 2;
+
+    const candidates = components
+      .map((component, index) => ({ component, index }))
+      .filter(({ component, index }) => {
+        if (index === i || used.has(index)) return false;
+
+        const dotCenterX =
+          component.x + component.width / 2;
+
+        const dotCenterY =
+          component.y + component.height / 2;
+
+        const barCenterY =
+          bar.y + bar.height / 2;
+
+        const horizontalDistance =
+          Math.abs(dotCenterX - centerX);
+
+        const verticalDistance =
+          Math.abs(dotCenterY - barCenterY);
+
+        const isSmallMark =
+          component.width <= bar.width * 0.5 &&
+          component.height <= bar.width * 0.5;
+
+        const isAligned =
+          horizontalDistance <= bar.width * 0.3;
+
+        const isNearBar =
+          verticalDistance <= bar.width * 0.8;
+
+        return (
+          isSmallMark &&
+          isAligned &&
+          isNearBar
+        );
+      });
+
+    const above = candidates.find(
+      ({ component }) =>
+        component.y + component.height / 2 <
+        bar.y + bar.height / 2
+    );
+
+    const below = candidates.find(
+      ({ component }) =>
+        component.y + component.height / 2 >
+        bar.y + bar.height / 2
+    );
+
+    if (above && below) {
+      const parts = [
+        bar,
+        above.component,
+        below.component,
+      ];
+
+      const minX = Math.min(...parts.map(p => p.x));
+      const minY = Math.min(...parts.map(p => p.y));
+
+      const maxX = Math.max(
+        ...parts.map(p => p.x + p.width)
+      );
+
+      const maxY = Math.max(
+        ...parts.map(p => p.y + p.height)
+      );
+
+      grouped.push({
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+        area: parts.reduce((sum, p) => sum + p.area, 0),
+      });
+
+      used.add(i);
+      used.add(above.index);
+      used.add(below.index);
+    }
+  }
+
+  // Keep every component that wasn't grouped.
+  components.forEach((component, index) => {
+    if (!used.has(index)) {
+      grouped.push(component);
+    }
+  });
+
+  return grouped.sort((a, b) => a.x - b.x);
+}

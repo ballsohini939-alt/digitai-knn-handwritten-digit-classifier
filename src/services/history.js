@@ -1,6 +1,5 @@
 
 const STORAGE_KEY = "digitai_prediction_history";
-
 export function getPredictionHistory() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -9,7 +8,6 @@ export function getPredictionHistory() {
     return [];
   }
 }
-
 export function savePrediction(record) {
   const history = getPredictionHistory();
 

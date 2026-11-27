@@ -29,3 +29,5 @@ dist-ssr
 
 # Local operating system files
 Thumbs.db
+
+src/pages/Recognition-backup.jsx

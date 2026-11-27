@@ -3153,3 +3153,214 @@ body {
 .recognition-page {
   color: #292929;
 }
+
+/* =========================================
+   RECOGNITION STUDIO - TASK MODE
+========================================= */
+
+.task-mode-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 22px 0;
+  padding: 22px;
+  background: linear-gradient(
+    145deg,
+    rgba(25, 22, 39, 0.96),
+    rgba(17, 16, 29, 0.96)
+  );
+  border: 1px solid rgba(167, 139, 250, 0.16);
+  border-radius: 18px;
+}
+
+.task-mode-heading h3 {
+  margin: 0 0 6px;
+  color: #f3f1fa;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.task-mode-heading p {
+  margin: 0;
+  color: #9691a8;
+  font-size: 13px;
+}
+
+.task-mode-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.task-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 16px;
+  color: #aaa5bb;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(167, 139, 250, 0.13);
+  border-radius: 13px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.task-mode-option:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.4);
+  transform: translateY(-2px);
+}
+
+.task-mode-option.active {
+  color: #e9e2ff;
+  background: rgba(167, 139, 250, 0.12);
+  border-color: #a78bfa;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.08);
+}
+
+.task-mode-option.active > svg {
+  color: #c4b5fd;
+}
+
+.task-mode-option > svg {
+  flex-shrink: 0;
+  color: #9691a8;
+}
+
+.task-mode-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.task-mode-option strong {
+  color: #f3f1fa;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-mode-option small {
+  color: #9691a8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.task-mode-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.task-mode-hint {
+  margin: -7px 0 0;
+  color: #fbbf24;
+  font-size: 12px;
+}
+
+/* =========================================
+   EXPRESSION MODE INSTRUCTIONS
+========================================= */
+
+.expression-instructions {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 18px;
+  padding: 20px;
+  background: rgba(167, 139, 250, 0.055);
+  border: 1px solid rgba(167, 139, 250, 0.17);
+  border-radius: 16px;
+}
+
+.expression-instructions h3 {
+  margin: 0 0 7px;
+  color: #f3f1fa;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 16px;
+}
+
+.expression-instructions p {
+  margin: 0;
+  color: #aaa5bb;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.supported-operators {
+  display: flex;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.supported-operators span {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  place-items: center;
+  color: #c4b5fd;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  border-radius: 9px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+/* =========================================
+   EXPRESSION EVALUATION BUTTON
+========================================= */
+
+.expression-test-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 49px;
+  padding: 13px 18px;
+  color: #f3f1fa;
+  background: linear-gradient(120deg, #7654d8, #9b72ee);
+  border: 1px solid rgba(196, 181, 253, 0.35);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expression-test-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+}
+
+.expression-test-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   RESPONSIVE TASK SELECTOR
+========================================= */
+
+@media (max-width: 600px) {
+  .task-mode-section {
+    padding: 16px;
+  }
+
+  .task-mode-switcher {
+    grid-template-columns: 1fr;
+  }
+
+  .task-mode-option {
+    padding: 14px;
+  }
+
+  .expression-instructions {
+    padding: 15px;
+  }
+}

@@ -1,8 +1,14 @@
 ﻿
 import { useEffect, useRef, useState } from "react";
-import { extractSymbols } from "../services/expressionSegmentation";
+
+import {
+  extractSymbols,
+  groupDivisionComponents,
+} from "../services/expressionSegmentation";
+
 import { prepareExpressionSymbols } from "../services/prepareExpressionSymbols";
 import { recognizeOperator } from "../services/operatorRecognition";
+
 import {
   Activity,
   ArrowRight,
@@ -18,11 +24,15 @@ import {
 
 import DrawingCanvas from "../components/DrawingCanvas";
 import { loadMNIST } from "../services/mnistLoader";
-import { predictDigit } from "../services/knnPredict";
+import {
+  predictDigit,
+  predictDigitWeighted,
+} from "../services/knnPredict";
 import {
   preprocessCanvas,
   preprocessCameraCanvas,
 } from "../services/preprocessCanvas";
+
 import { savePrediction } from "../services/history";
 
 // Displays an actual 28 x 28 MNIST training image.
@@ -61,6 +71,7 @@ function NeighborThumbnail({ pixels }) {
   );
 }
 
+// Displays the image actually passed to KNN.
 function ProcessedImagePreview({ pixels }) {
   const previewRef = useRef(null);
 
@@ -103,24 +114,45 @@ export default function Recognition() {
   const videoRef = useRef(null);
   const cameraStreamRef = useRef(null);
 
+  // Single digit prediction state.
   const [result, setResult] = useState(null);
   const [predicting, setPredicting] = useState(false);
   const [kValue, setKValue] = useState(5);
   const [message, setMessage] = useState("");
   const [processedPixels, setProcessedPixels] = useState(null);
-const [expressionPreviews, setExpressionPreviews] = useState([]);
-const [expressionResult, setExpressionResult] = useState(null);  
-// Camera mode state.
+
+  // Expression recognition state.
+  const [expressionPreviews, setExpressionPreviews] = useState([]);
+  const [expressionResult, setExpressionResult] = useState(null);
+
+  // Input and task modes.
   const [activeMode, setActiveMode] = useState("sketch");
+  const [taskMode, setTaskMode] = useState("single");
+
+  // Camera state.
   const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [capturedImage, setCapturedImage] = useState(null);
 
+  // Clear results when switching recognition tasks.
+  function changeTaskMode(mode) {
+    setTaskMode(mode);
+    setResult(null);
+    setMessage("");
+    setProcessedPixels(null);
+    setExpressionPreviews([]);
+    setExpressionResult(null);
+  }
+
   // Open the device camera.
   async function startCamera() {
     setActiveMode("camera");
+    setTaskMode("single");
     setCameraError("");
+    setMessage("");
     setCapturedImage(null);
+    setResult(null);
+    setProcessedPixels(null);
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError(
@@ -208,111 +240,111 @@ const [expressionResult, setExpressionResult] = useState(null);
 
     setCapturedImage(captureCanvas.toDataURL("image/png"));
     setCameraError("");
+    setResult(null);
+    setProcessedPixels(null);
   }
 
-
-async function handleCameraPrediction() {
-  if (!capturedImage) {
-    setCameraError("Please capture a photo first.");
-    return;
-  }
-
-  setCameraError("");
-  setMessage("");
-  setPredicting(true);
-  setResult(null);
-  setProcessedPixels(null);
-
-  try {
-    if (!datasetRef.current) {
-      setMessage("Loading 5,000 MNIST training images...");
-      datasetRef.current = await loadMNIST();
+  // Predict a digit from the captured camera image.
+  async function handleCameraPrediction() {
+    if (!capturedImage) {
+      setCameraError("Please capture a photo first.");
+      return;
     }
 
-    setMessage("Preparing your camera image...");
-
-    const image = new Image();
-
-    image.src = capturedImage;
-
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = () =>
-        reject(new Error("Unable to load the captured photo."));
-    });
-
-    const photoCanvas = document.createElement("canvas");
-    photoCanvas.width = image.naturalWidth;
-    photoCanvas.height = image.naturalHeight;
-
-    const context = photoCanvas.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    context.drawImage(image, 0, 0);
-
-    const inputPixels = preprocessCameraCanvas(photoCanvas);
-
-    setProcessedPixels(inputPixels);
-
-    setMessage("Comparing with MNIST training examples...");
-
-    const prediction = predictDigit(
-      inputPixels,
-      datasetRef.current,
-      kValue
-    );
-
-console.log(
-  "CAMERA KNN DIAGNOSTICS:",
-  JSON.stringify(
-    {
-      predictedDigit: prediction.predictedDigit,
-      votes: prediction.votes,
-      k: prediction.k,
-      neighbors: prediction.neighbors.map((n, index) => ({
-        rank: index + 1,
-        digit: n.label,
-        distance: Math.sqrt(n.distance).toFixed(2),
-      })),
-    },
-    null,
-    2
-  )
-);
-
-
-    const resultData = {
-      digit: prediction.predictedDigit,
-      votes: prediction.votes,
-      neighbors: prediction.neighbors,
-      mode: "knn",
-      k: prediction.k,
-    };
-
-    savePrediction({
-      id: Date.now(),
-      digit: resultData.digit,
-      votes: resultData.votes,
-      image: Array.from(inputPixels),
-      mode: "camera",
-      k: prediction.k,
-      createdAt: new Date().toISOString(),
-    });
-
-    setResult(resultData);
+    setCameraError("");
     setMessage("");
-  } catch (error) {
-    console.error("Camera prediction error:", error);
+    setPredicting(true);
+    setResult(null);
+    setProcessedPixels(null);
 
-    setCameraError(
-      error.message || "Camera prediction failed. Please try again."
-    );
-  } finally {
-    setPredicting(false);
+    try {
+      if (!datasetRef.current) {
+        setMessage("Loading 5,000 MNIST training images...");
+        datasetRef.current = await loadMNIST();
+      }
+
+      setMessage("Preparing your camera image...");
+
+      const image = new Image();
+      image.src = capturedImage;
+
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = () =>
+          reject(new Error("Unable to load the captured photo."));
+      });
+
+      const photoCanvas = document.createElement("canvas");
+
+      photoCanvas.width = image.naturalWidth;
+      photoCanvas.height = image.naturalHeight;
+
+      const context = photoCanvas.getContext("2d", {
+        willReadFrequently: true,
+      });
+
+      context.drawImage(image, 0, 0);
+
+      const inputPixels = preprocessCameraCanvas(photoCanvas);
+
+      setProcessedPixels(inputPixels);
+
+      setMessage("Comparing with MNIST training examples...");
+
+      const prediction = predictDigit(
+        inputPixels,
+        datasetRef.current,
+        kValue
+      );
+
+      console.log(
+        "CAMERA KNN DIAGNOSTICS:",
+        JSON.stringify(
+          {
+            predictedDigit: prediction.predictedDigit,
+            votes: prediction.votes,
+            k: prediction.k,
+            neighbors: prediction.neighbors.map((neighbor, index) => ({
+              rank: index + 1,
+              digit: neighbor.label,
+              distance: Math.sqrt(neighbor.distance).toFixed(2),
+            })),
+          },
+          null,
+          2
+        )
+      );
+
+      const resultData = {
+        digit: prediction.predictedDigit,
+        votes: prediction.votes,
+        neighbors: prediction.neighbors,
+        mode: "knn",
+        k: prediction.k,
+      };
+
+      savePrediction({
+        id: Date.now(),
+        digit: resultData.digit,
+        votes: resultData.votes,
+        image: Array.from(inputPixels),
+        mode: "camera",
+        k: prediction.k,
+        createdAt: new Date().toISOString(),
+      });
+
+      setResult(resultData);
+      setMessage("");
+    } catch (error) {
+      console.error("Camera prediction error:", error);
+
+      setCameraError(
+        error.message || "Camera prediction failed. Please try again."
+      );
+    } finally {
+      setPredicting(false);
+    }
   }
-}
-
 
   // Attach the active stream to the video element.
   useEffect(() => {
@@ -329,7 +361,8 @@ console.log(
         setCameraError("Unable to display the camera preview.");
       });
     }
-}, [cameraStarted, activeMode, capturedImage]);
+  }, [cameraStarted, activeMode, capturedImage]);
+
   // Release camera resources when the component unmounts.
   useEffect(() => {
     return () => {
@@ -339,7 +372,7 @@ console.log(
     };
   }, []);
 
-  // Existing KNN prediction function.
+  // Existing real KNN sketch prediction.
   async function handlePrediction() {
     if (!canvasRef.current?.hasDrawing()) {
       setMessage("Please draw a digit before starting a prediction.");
@@ -350,6 +383,8 @@ console.log(
     setMessage("");
     setPredicting(true);
     setResult(null);
+    setExpressionResult(null);
+    setExpressionPreviews([]);
 
     try {
       if (!datasetRef.current) {
@@ -357,12 +392,9 @@ console.log(
         datasetRef.current = await loadMNIST();
       }
 
-      setMessage(
-        "Comparing your drawing with the nearest examples..."
-      );
+      setMessage("Comparing your drawing with the nearest examples...");
 
       const canvas = canvasRef.current.getCanvas();
-
       const inputPixels = preprocessCanvas(canvas);
 
       setProcessedPixels(inputPixels);
@@ -374,13 +406,13 @@ console.log(
       );
 
       console.log(
-  "CLOSEST MNIST EXAMPLE FOR EACH DIGIT:",
-  prediction.closestByDigit.map((item) => ({
-    digit: item?.label,
-    distance: item?.distance,
-    index: item?.index,
-  }))
-);
+        "CLOSEST MNIST EXAMPLE FOR EACH DIGIT:",
+        prediction.closestByDigit.map((item) => ({
+          digit: item?.label,
+          distance: item?.distance,
+          index: item?.index,
+        }))
+      );
 
       console.log(
         "PREDICTION CHECK:",
@@ -389,9 +421,9 @@ console.log(
             predictedDigit: prediction.predictedDigit,
             votes: prediction.votes,
             k: prediction.k,
-            neighbors: prediction.neighbors.map((n) => ({
-              digit: n.label,
-              distance: Math.sqrt(n.distance).toFixed(2),
+            neighbors: prediction.neighbors.map((neighbor) => ({
+              digit: neighbor.label,
+              distance: Math.sqrt(neighbor.distance).toFixed(2),
             })),
           },
           null,
@@ -441,18 +473,282 @@ console.log(
     }
   }
 
-  function handleClear() {
-    canvasRef.current?.clear();
-    setResult(null);
+  // Real expression segmentation and recognition.
+  async function handleExpressionSegmentation() {
+    if (!canvasRef.current?.hasDrawing()) {
+      setMessage("Please draw an expression before evaluating it.");
+      setExpressionResult(null);
+      setExpressionPreviews([]);
+      return;
+    }
+
+    setPredicting(true);
     setMessage("");
+    setResult(null);
     setProcessedPixels(null);
+    setExpressionResult(null);
+    setExpressionPreviews([]);
+
+    try {
+      const canvas = canvasRef.current.getCanvas();
+
+      // Extract connected components and group division components.
+      const extractedSymbols = extractSymbols(canvas);
+      const symbols = groupDivisionComponents(extractedSymbols);
+
+      // Prepare the extracted symbols as 28 x 28 images.
+      const preparedSymbols = prepareExpressionSymbols(
+        canvas,
+        symbols
+      );
+
+      setExpressionPreviews(preparedSymbols);
+
+      if (preparedSymbols.length !== 3) {
+        setMessage(
+          `Expected 3 symbols (digit, operator, digit), but detected ${preparedSymbols.length}. Please draw the expression clearly.`
+        );
+        return;
+      }
+
+      console.log(
+        "FIRST DIGIT PREVIEW:",
+        preparedSymbols[0].preview
+      );
+
+      // Load the real MNIST dataset if necessary.
+      if (!datasetRef.current) {
+        setMessage("Loading 5,000 MNIST training images...");
+        datasetRef.current = await loadMNIST();
+      }
+
+      setMessage("Recognizing expression digits...");
+
+      // Classify the first and third symbols using actual KNN.
+      const firstPrediction = predictDigit(
+        preparedSymbols[0].pixels,
+        datasetRef.current,
+        5
+      );
+
+      const secondPrediction = predictDigit(
+        preparedSymbols[2].pixels,
+        datasetRef.current,
+        5
+      );
+      const firstWeighted = predictDigitWeighted(
+  preparedSymbols[0].pixels,
+  datasetRef.current,
+  5
+);
+
+const secondWeighted = predictDigitWeighted(
+  preparedSymbols[2].pixels,
+  datasetRef.current,
+  5
+);
+
+console.log("WEIGHTED KNN COMPARISON:", {
+  firstDigit: {
+    original: firstPrediction.predictedDigit,
+    weighted: firstWeighted.predictedDigit,
+    votes: firstWeighted.weightedVotes,
+  },
+  secondDigit: {
+    original: secondPrediction.predictedDigit,
+    weighted: secondWeighted.predictedDigit,
+    votes: secondWeighted.weightedVotes,
+  },
+});
+      console.log("EXPRESSION KNN DIAGNOSTICS:", {
+  firstDigit: {
+    predicted: firstPrediction.predictedDigit,
+    nearestNeighbors: firstPrediction.neighbors.map((n) => ({
+      digit: n.label,
+      distance: Math.sqrt(n.distance).toFixed(2),
+      index: n.index,
+    })),
+  },
+
+  secondDigit: {
+    predicted: secondPrediction.predictedDigit,
+    nearestNeighbors: secondPrediction.neighbors.map((n) => ({
+      digit: n.label,
+      distance: Math.sqrt(n.distance).toFixed(2),
+      index: n.index,
+    })),
+  },
+});
+console.table([
+  ...firstPrediction.neighbors.map((n) => ({
+    position: "First digit",
+    predicted: firstPrediction.predictedDigit,
+    matchedDigit: n.label,
+    distance: Math.sqrt(n.distance).toFixed(2),
+    trainingIndex: n.index,
+  })),
+  ...secondPrediction.neighbors.map((n) => ({
+    position: "Second digit",
+    predicted: secondPrediction.predictedDigit,
+    matchedDigit: n.label,
+    distance: Math.sqrt(n.distance).toFixed(2),
+    trainingIndex: n.index,
+  })),
+]);
+
+      console.log("FIRST DIGIT PREPROCESSED PIXELS:", [
+        ...preparedSymbols[0].pixels,
+      ]);
+console.table(
+  firstPrediction.closestByDigit.map((neighbor, digit) => ({
+    actualClass: digit,
+    nearestMatchedDigit: neighbor?.label,
+    distance: neighbor
+      ? Math.sqrt(neighbor.distance).toFixed(2)
+      : "Not found",
+    trainingIndex: neighbor?.index,
+  }))
+);
+
+console.table(
+  secondPrediction.closestByDigit.map((neighbor, digit) => ({
+    actualClass: digit,
+    nearestMatchedDigit: neighbor?.label,
+    distance: neighbor
+      ? Math.sqrt(neighbor.distance).toFixed(2)
+      : "Not found",
+    trainingIndex: neighbor?.index,
+  }))
+);
+      console.log(
+        "FIRST EXPRESSION DIGIT NEIGHBORS:",
+        firstPrediction.neighbors.map((neighbor, index) => ({
+          rank: index + 1,
+          digit: neighbor.label,
+          distance: Math.sqrt(neighbor.distance).toFixed(2),
+        }))
+      );
+
+      console.log(
+        "FIRST DIGIT CLOSEST EXAMPLE PER CLASS:",
+        firstPrediction.closestByDigit.map((item) => ({
+          digit: item?.label,
+          distance: item
+            ? Math.sqrt(item.distance).toFixed(2)
+            : null,
+        }))
+      );
+
+      // Recognize the middle symbol as an operator.
+      const operator = recognizeOperator(
+        canvas,
+        preparedSymbols[1]
+      );
+
+      console.log("DETECTED OPERATOR:", operator);
+
+      const firstDigit = Number(firstPrediction.predictedDigit);
+      const secondDigit = Number(secondPrediction.predictedDigit);
+
+      const operations = {
+        "+": {
+          display: "+",
+          calculate: (a, b) => a + b,
+        },
+        "-": {
+          display: "−",
+          calculate: (a, b) => a - b,
+        },
+        "*": {
+          display: "×",
+          calculate: (a, b) => a * b,
+        },
+        "/": {
+          display: "÷",
+          calculate: (a, b) => a / b,
+        },
+      };
+
+      const selectedOperation = operations[operator];
+
+      if (!selectedOperation) {
+        setMessage("Unable to recognize the arithmetic operator.");
+        return;
+      }
+
+      if (operator === "/" && secondDigit === 0) {
+        setMessage(
+          "Division by zero is not allowed. Please draw another expression."
+        );
+        return;
+      }
+
+      const answer = selectedOperation.calculate(
+        firstDigit,
+        secondDigit
+      );
+
+      const expression = `${firstDigit} ${selectedOperation.display} ${secondDigit}`;
+
+      setExpressionResult({
+        expression,
+        answer,
+      });
+
+      setMessage("");
+
+      console.log("FINAL EXPRESSION:", {
+        expression,
+        answer,
+      });
+
+      console.log("EXPRESSION DIGIT PREDICTIONS:", {
+        firstDigit: firstPrediction.predictedDigit,
+        secondDigit: secondPrediction.predictedDigit,
+      });
+
+      console.log(
+        "PREPARED EXPRESSION SYMBOLS:",
+        preparedSymbols.map((symbol, index) => ({
+          position: index + 1,
+          x: symbol.x,
+          width: symbol.width,
+          height: symbol.height,
+          pixels: symbol.pixels.length,
+          preview: symbol.preview,
+        }))
+      );
+    } catch (error) {
+      console.error("Expression preparation error:", error);
+
+      setMessage(
+        error.message || "Expression recognition failed. Please try again."
+      );
+    } finally {
+      setPredicting(false);
+    }
   }
 
-  function handleUndo() {
-    canvasRef.current?.undo();
+  // Clear the displayed prediction and expression output.
+  function handleClear() {
+    canvasRef.current?.clear();
+
     setResult(null);
     setMessage("");
     setProcessedPixels(null);
+    setExpressionPreviews([]);
+    setExpressionResult(null);
+  }
+
+  // Undo the latest stroke and clear stale outputs.
+  function handleUndo() {
+    canvasRef.current?.undo();
+
+    setResult(null);
+    setMessage("");
+    setProcessedPixels(null);
+    setExpressionPreviews([]);
+    setExpressionResult(null);
   }
 
   const sortedVotes = result
@@ -461,116 +757,14 @@ console.log(
         .sort((a, b) => b.count - a.count)
     : [];
 
-async function handleExpressionSegmentation() {
-    try {
-    const canvas = canvasRef.current?.getCanvas();
-
-    const symbols = extractSymbols(canvas);
-
-    const preparedSymbols = prepareExpressionSymbols(
-      canvas,
-      symbols
-    );
-    console.log(
-  "FIRST DIGIT PREVIEW:",
-  preparedSymbols[0].preview
-);
-    // Load MNIST if it has not been loaded yet.
-if (!datasetRef.current) {
-  setMessage("Loading 5,000 MNIST training images...");
-  datasetRef.current = await loadMNIST();
-}
-
-setMessage("Recognizing expression digits...");
-setExpressionResult(null);
-// Recognize the first and third symbols as digits.
-const firstPrediction = predictDigit(
-  preparedSymbols[0].pixels,
-  datasetRef.current,
-  1
-);
-console.log("FIRST DIGIT PREPROCESSED PIXELS:", [
-  ...preparedSymbols[0].pixels,
-]);
-const secondPrediction = predictDigit(
-  preparedSymbols[2].pixels,
-  datasetRef.current,
-  1
-);
-console.log(
-  "FIRST EXPRESSION DIGIT NEIGHBORS:",
-  firstPrediction.neighbors.map((neighbor, index) => ({
-    rank: index + 1,
-    digit: neighbor.label,
-    distance: Math.sqrt(neighbor.distance).toFixed(2),
-  }))
-);
-
-console.log(
-  "FIRST DIGIT CLOSEST EXAMPLE PER CLASS:",
-  firstPrediction.closestByDigit.map((item) => ({
-    digit: item?.label,
-    distance: item
-      ? Math.sqrt(item.distance).toFixed(2)
-      : null,
-  }))
-);
-// Recognize the middle symbol as an operator.
-const operator = recognizeOperator(
-  canvas,
-  preparedSymbols[1]
-);
-
-console.log("DETECTED OPERATOR:", operator);
-// Calculate the recognized expression.
-if (operator === "+") {
-  const firstDigit = Number(firstPrediction.predictedDigit);
-  const secondDigit = Number(secondPrediction.predictedDigit);
-
-  const answer = firstDigit + secondDigit;
-
-  setExpressionResult({
-    expression: `${firstDigit} + ${secondDigit}`,
-    answer,
-  });
-
-  console.log("FINAL EXPRESSION:", {
-    expression: `${firstDigit} + ${secondDigit}`,
-    answer,
-  });
-} else {
-  setExpressionResult(null);
-  setMessage("Unable to recognize the arithmetic operator.");
-}
-console.log("EXPRESSION DIGIT PREDICTIONS:", {
-  firstDigit: firstPrediction.predictedDigit,
-  secondDigit: secondPrediction.predictedDigit,
-});
-    setExpressionPreviews(preparedSymbols);
-
-    console.log(
-      "PREPARED EXPRESSION SYMBOLS:",
-      preparedSymbols.map((symbol, index) => ({
-        position: index + 1,
-        x: symbol.x,
-        width: symbol.width,
-        height: symbol.height,
-        pixels: symbol.pixels.length,
-        preview: symbol.preview,
-      }))
-    );
-  } catch (error) {
-    console.error("Expression preparation error:", error);
-    alert(error.message);
-  }
-}
-
   return (
     <div className="page-content recognition-page">
+      {/* Studio heading */}
       <section className="recognition-heading">
         <div>
           <div className="eyebrow">
-            <span className="eyebrow-dot" /> INTERACTIVE LAB
+            <span className="eyebrow-dot" />
+            INTERACTIVE LAB
           </div>
 
           <h1>
@@ -578,17 +772,36 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
           </h1>
 
           <p>
-            Draw or capture a handwritten digit using your device.
+            Draw or capture handwriting and explore real KNN recognition.
           </p>
         </div>
 
         <div className="studio-mode">
-          <span /> KNN MODEL ACTIVE
+          <span />
+          KNN MODEL ACTIVE
         </div>
       </section>
 
-      {/* Recognition mode switcher */}
+      {/* Input mode selector */}
       <div className="recognition-mode-switcher">
+        <button
+          type="button"
+          className={
+            activeMode === "sketch"
+              ? "mode-option active"
+              : "mode-option"
+          }
+          onClick={() => {
+            stopCamera();
+            setActiveMode("sketch");
+            setCameraError("");
+            setMessage("");
+          }}
+        >
+          <Fingerprint size={18} />
+          Sketch
+        </button>
+
         <button
           type="button"
           className={
@@ -601,454 +814,555 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
           <Camera size={18} />
           Live Camera
         </button>
-
-        <button
-          type="button"
-          className={
-            activeMode === "sketch"
-              ? "mode-option active"
-              : "mode-option"
-          }
-          onClick={() => {
-            stopCamera();
-            setActiveMode("sketch");
-            setCameraError("");
-          }}
-        >
-          <Fingerprint size={18} />
-          Sketching
-        </button>
       </div>
 
-{/* Live Camera mode */}
-{activeMode === "camera" ? (
-  <section className="camera-studio">
-    <div className="camera-studio-heading">
-      <div>
-        <h2>Live Camera</h2>
-        <p>
-          Capture a handwritten digit using your camera.
-        </p>
-      </div>
-
-      <span className="camera-status">
-        {cameraStarted ? "Camera active" : "Camera inactive"}
-      </span>
-    </div>
-
-    <div className="camera-preview-container">
-      {capturedImage ? (
-        <img
-          src={capturedImage}
-          alt="Captured handwritten digit"
-          className="camera-captured-image"
-        />
-      ) : cameraStarted ? (
-        <video
-          ref={videoRef}
-          className="camera-video"
-          autoPlay
-          playsInline
-          muted
-        />
-      ) : (
-        <div className="camera-placeholder">
-          <CameraOff size={42} />
-          <strong>Camera preview</strong>
-          <span>Open your camera to begin.</span>
-        </div>
-      )}
-    </div>
-
-    {cameraError && (
-      <div className="recognition-message">
-        <CircleHelp size={16} />
-        {cameraError}
-      </div>
-    )}
-
-    {message && (
-      <div className="recognition-message">
-        <CircleHelp size={16} />
-        {message}
-      </div>
-    )}
-
-    <div className="camera-controls">
-      {!cameraStarted ? (
-        <button
-          type="button"
-          className="predict-button"
-          onClick={startCamera}
-        >
-          <Camera size={18} />
-          Open Camera
-        </button>
-      ) : capturedImage ? (
-        <>
-          <button
-            type="button"
-            className="predict-button"
-            onClick={handleCameraPrediction}
-            disabled={predicting}
-          >
-            {predicting ? (
-              <>
-                <span className="loading-spinner" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} />
-                Predict Digit
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            className="canvas-action"
-            onClick={() => {
-              setCapturedImage(null);
-              setCameraError("");
-              setMessage("");
-              setResult(null);
-              setProcessedPixels(null);
-            }}
-            disabled={predicting}
-          >
-            Retake
-          </button>
-
-          <button
-            type="button"
-            className="canvas-action clear-action"
-            onClick={stopCamera}
-            disabled={predicting}
-          >
-            Close Camera
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            type="button"
-            className="predict-button"
-            onClick={capturePhoto}
-          >
-            <Camera size={18} />
-            Capture Photo
-          </button>
-
-          <button
-            type="button"
-            className="canvas-action clear-action"
-            onClick={stopCamera}
-          >
-            Close Camera
-          </button>
-        </>
-      )}
-    </div>
-
-    <p className="camera-instruction">
-      Place one handwritten digit clearly in front of the camera.
-    </p>
-
-    {result && (
-      <div className="result-card">
-        <div className="result-heading">
+      {/* Task mode selector */}
+      <section className="task-mode-section">
+        <div className="task-mode-heading">
           <div>
-            <h3>Prediction result</h3>
-            <p>Your camera image classification output</p>
-          </div>
-          <span className="result-demo-tag">REAL KNN</span>
-        </div>
-
-        <div className="result-content">
-          <div className="result-digit">
-            <span>Predicted digit</span>
-            <strong>{result.digit}</strong>
-            <small>Actual KNN prediction</small>
+            <h3>Recognition task</h3>
+            <p>Choose what you want the model to recognize.</p>
           </div>
         </div>
-<div className="processed-preview-card">
-  <div className="processed-preview-heading">
-    <h3>KNN input image</h3>
-    <span>28 × 28 PIXELS</span>
-  </div>
 
-  <div className="processed-preview-stage">
-    <ProcessedImagePreview pixels={processedPixels} />
-  </div>
+        <div className="task-mode-switcher">
+          <button
+            type="button"
+            className={
+              taskMode === "single"
+                ? "task-mode-option active"
+                : "task-mode-option"
+            }
+            onClick={() => changeTaskMode("single")}
+          >
+            <Fingerprint size={18} />
+            <span>
+              <strong>Single Digit</strong>
+              <small>Recognize one handwritten number</small>
+            </span>
+          </button>
 
-  <p className="processed-preview-caption">
-    This is the image actually supplied to the KNN classifier.
-  </p>
-</div>
+          <button
+            type="button"
+            className={
+              taskMode === "expression"
+                ? "task-mode-option active"
+                : "task-mode-option"
+            }
+            onClick={() => changeTaskMode("expression")}
+            disabled={activeMode === "camera"}
+            title={
+              activeMode === "camera"
+                ? "Expression recognition is available in Sketch mode."
+                : "Recognize a handwritten arithmetic expression."
+            }
+          >
+            <Sparkles size={18} />
+            <span>
+              <strong>Expression</strong>
+              <small>Recognize and calculate an expression</small>
+            </span>
+          </button>
+        </div>
 
-      </div>
-    )}
-  </section>
-) : (
+        {activeMode === "camera" && (
+          <p className="task-mode-hint">
+            Expression recognition is currently available in Sketch mode.
+          </p>
+        )}
+      </section>
 
-        /* Existing Sketching mode */
-        <div className="recognition-layout">
-          <section className="recognition-main">
-            <div className="k-selector-card">
-              <div className="k-selector-heading">
-                <div>
-                  <h3>Choose K value</h3>
-                  <p>
-                    Select how many nearest neighbors the model should compare.
-                  </p>
-                </div>
-
-                <span className="k-selected-badge">
-                  K = {kValue}
-                </span>
-              </div>
-
-              <div className="k-selector-options">
-                {[1, 3, 5, 7, 9].map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`k-option ${
-                      kValue === value ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setKValue(value);
-                      setResult(null);
-                    }}
-                    disabled={predicting}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-
-              <p className="k-selector-hint">
-                {kValue === 1
-                  ? "Uses only the single closest training example."
-                  : `Uses the ${kValue} closest training examples and majority voting.`}
+      {/* Live Camera mode */}
+      {activeMode === "camera" ? (
+        <section className="camera-studio">
+          <div className="camera-studio-heading">
+            <div>
+              <h2>Live Camera</h2>
+              <p>
+                Capture a handwritten digit using your camera.
               </p>
             </div>
 
-            <div className="drawing-preview-layout">
-              <DrawingCanvas
-                ref={canvasRef}
+            <span className="camera-status">
+              {cameraStarted ? "Camera active" : "Camera inactive"}
+            </span>
+          </div>
+
+          <div className="camera-preview-container">
+            {capturedImage ? (
+              <img
+                src={capturedImage}
+                alt="Captured handwritten digit"
+                className="camera-captured-image"
               />
-<button
-  type="button"
-  className="expression-test-button"
-  onClick={handleExpressionSegmentation}
->
-  <Sparkles size={16} />
-  Test Expression Segmentation
-</button>
-{expressionPreviews.length > 0 && (
-  <div className="expression-previews">
-    <h3>Extracted Symbols</h3>
-
-    <div className="expression-preview-list">
-      {expressionPreviews.map((symbol, index) => (
-        <div key={index} className="expression-preview-item">
-          <img
-            src={symbol.preview}
-            alt={`Extracted symbol ${index + 1}`}
-            width="84"
-            height="84"
-          />
-          <p>Symbol {index + 1}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-{expressionResult && (
-  <div className="expression-result-card">
-    <p className="expression-result-label">
-      Recognized Expression
-    </p>
-
-    <h2>{expressionResult.expression}</h2>
-
-    <div className="expression-answer">
-      <span>Answer</span>
-      <strong>{expressionResult.answer}</strong>
-    </div>
-  </div>
-)}
-
-              <div className="processed-preview-card">
-                <div className="processed-preview-heading">
-                  <h3>Preprocessed image</h3>
-                  <span>28 × 28 PIXELS</span>
-                </div>
-
-                {processedPixels ? (
-                  <>
-                    <div className="processed-preview-stage">
-                      <ProcessedImagePreview pixels={processedPixels} />
-                    </div>
-
-                    <p className="processed-preview-caption">
-                      Centered grayscale image used by the KNN classifier.
-                    </p>
-                  </>
-                ) : (
-                  <div className="processed-preview-empty">
-                    <Fingerprint size={25} />
-                    <strong>Preview unavailable</strong>
-                    <span>
-                      Draw a digit and click Predict Digit.
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {message && (
-              <div className="recognition-message">
-                <CircleHelp size={16} />
-                {message}
+            ) : cameraStarted ? (
+              <video
+                ref={videoRef}
+                className="camera-video"
+                autoPlay
+                playsInline
+                muted
+              />
+            ) : (
+              <div className="camera-placeholder">
+                <CameraOff size={42} />
+                <strong>Camera preview</strong>
+                <span>Open your camera to begin.</span>
               </div>
             )}
+          </div>
 
-            <button
-              className="predict-button"
-              onClick={handlePrediction}
-              disabled={predicting}
-            >
-              {predicting ? (
-                <>
-                  <span className="loading-spinner" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={17} />
-                  Predict Digit
-                  <ArrowRight size={17} />
-                </>
-              )}
-            </button>
+          {cameraError && (
+            <div className="recognition-message">
+              <CircleHelp size={16} />
+              {cameraError}
+            </div>
+          )}
 
+          {message && (
+            <div className="recognition-message">
+              <CircleHelp size={16} />
+              {message}
+            </div>
+          )}
+
+          <div className="camera-controls">
+            {!cameraStarted ? (
+              <button
+                type="button"
+                className="predict-button"
+                onClick={startCamera}
+              >
+                <Camera size={18} />
+                Open Camera
+              </button>
+            ) : capturedImage ? (
+              <>
+                <button
+                  type="button"
+                  className="predict-button"
+                  onClick={handleCameraPrediction}
+                  disabled={predicting}
+                >
+                  {predicting ? (
+                    <>
+                      <span className="loading-spinner" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      Predict Digit
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="canvas-action"
+                  onClick={() => {
+                    setCapturedImage(null);
+                    setCameraError("");
+                    setMessage("");
+                    setResult(null);
+                    setProcessedPixels(null);
+                  }}
+                  disabled={predicting}
+                >
+                  Retake
+                </button>
+
+                <button
+                  type="button"
+                  className="canvas-action clear-action"
+                  onClick={stopCamera}
+                  disabled={predicting}
+                >
+                  Close Camera
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="predict-button"
+                  onClick={capturePhoto}
+                >
+                  <Camera size={18} />
+                  Capture Photo
+                </button>
+
+                <button
+                  type="button"
+                  className="canvas-action clear-action"
+                  onClick={stopCamera}
+                >
+                  Close Camera
+                </button>
+              </>
+            )}
+          </div>
+
+          <p className="camera-instruction">
+            Place one handwritten digit clearly in front of the camera.
+          </p>
+
+          {result && (
             <div className="result-card">
               <div className="result-heading">
                 <div>
                   <h3>Prediction result</h3>
-                  <p>Your KNN classification output</p>
+                  <p>Your camera image classification output</p>
                 </div>
 
                 <span className="result-demo-tag">REAL KNN</span>
               </div>
 
-              {predicting ? (
-                <div className="result-empty">
-                  <div className="loading-spinner large-spinner" />
+              <div className="result-content">
+                <div className="result-digit">
+                  <span>Predicted digit</span>
+                  <strong>{result.digit}</strong>
+                  <small>Actual KNN prediction</small>
+                </div>
+              </div>
 
-                  <strong>Analyzing your handwriting</strong>
+              <div className="processed-preview-card">
+                <div className="processed-preview-heading">
+                  <h3>KNN input image</h3>
+                  <span>28 × 28 PIXELS</span>
+                </div>
 
-                  <span>
-                    Comparing your drawing with MNIST training examples.
+                <div className="processed-preview-stage">
+                  <ProcessedImagePreview pixels={processedPixels} />
+                </div>
+
+                <p className="processed-preview-caption">
+                  This is the image actually supplied to the KNN classifier.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      ) : (
+        /* Sketch mode */
+        <div className="recognition-layout">
+          <section className="recognition-main">
+            {/* K selector - used for single digit recognition */}
+            {taskMode === "single" && (
+              <div className="k-selector-card">
+                <div className="k-selector-heading">
+                  <div>
+                    <h3>Choose K value</h3>
+                    <p>
+                      Select how many nearest neighbors the model should compare.
+                    </p>
+                  </div>
+
+                  <span className="k-selected-badge">
+                    K = {kValue}
                   </span>
                 </div>
-              ) : result ? (
-                <>
-                  <div className="result-content">
-                    <div className="result-digit">
-                      <span>Predicted digit</span>
-                      <strong>{result.digit}</strong>
-                      <small>Actual KNN prediction</small>
-                    </div>
 
-                    <div className="result-votes">
-                      <div className="vote-title">
-                        <strong>Nearest-neighbor votes</strong>
-                        <span>{result.k} neighbors</span>
+                <div className="k-selector-options">
+                  {[1, 3, 5, 7, 9].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`k-option ${
+                        kValue === value ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        setKValue(value);
+                        setResult(null);
+                        setMessage("");
+                      }}
+                      disabled={predicting}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="k-selector-hint">
+                  {kValue === 1
+                    ? "Uses only the single closest training example."
+                    : `Uses the ${kValue} closest training examples and majority voting.`}
+                </p>
+              </div>
+            )}
+
+            {/* Expression instructions */}
+            {taskMode === "expression" && (
+              <div className="expression-instructions">
+                <div className="guide-icon">
+                  <Sparkles size={19} />
+                </div>
+
+                <div>
+                  <h3>Expression recognition</h3>
+                  <p>
+                    Draw three separate symbols in this order:
+                    first digit, operator, second digit.
+                  </p>
+
+                  <div className="supported-operators">
+                    <span>+</span>
+                    <span>−</span>
+                    <span>×</span>
+                    <span>÷</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Drawing canvas and preprocessing */}
+            <div className="drawing-preview-layout">
+              <DrawingCanvas ref={canvasRef} />
+
+              {/* Expression test control */}
+              {taskMode === "expression" && (
+                <button
+                  type="button"
+                  className="expression-test-button"
+                  onClick={handleExpressionSegmentation}
+                  disabled={predicting}
+                >
+                  {predicting ? (
+                    <>
+                      <span className="loading-spinner" />
+                      Evaluating Expression...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      Evaluate Expression
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Extracted expression symbols */}
+              {taskMode === "expression" &&
+                expressionPreviews.length > 0 && (
+                  <div className="expression-previews">
+                    <h3>Extracted Symbols</h3>
+
+                    <div className="expression-preview-list">
+                      {expressionPreviews.map((symbol, index) => (
+                        <div
+                          key={index}
+                          className="expression-preview-item"
+                        >
+                          <img
+                            src={symbol.preview}
+                            alt={`Extracted symbol ${index + 1}`}
+                            width="84"
+                            height="84"
+                          />
+
+                          <p>Symbol {index + 1}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Expression calculation result */}
+              {taskMode === "expression" && expressionResult && (
+                <div className="expression-result-card">
+                  <p className="expression-result-label">
+                    Recognized Expression
+                  </p>
+
+                  <h2>{expressionResult.expression}</h2>
+
+                  <div className="expression-answer">
+                    <span>Answer</span>
+                    <strong>{expressionResult.answer}</strong>
+                  </div>
+                </div>
+              )}
+
+              {/* Processed image preview - single digit mode */}
+              {taskMode === "single" && (
+                <div className="processed-preview-card">
+                  <div className="processed-preview-heading">
+                    <h3>Preprocessed image</h3>
+                    <span>28 × 28 PIXELS</span>
+                  </div>
+
+                  {processedPixels ? (
+                    <>
+                      <div className="processed-preview-stage">
+                        <ProcessedImagePreview pixels={processedPixels} />
                       </div>
 
-                      {sortedVotes.map((vote) => (
-                        <div className="vote-row" key={vote.digit}>
-                          <span className="vote-digit">
-                            {vote.digit}
-                          </span>
-
-                          <div className="vote-track">
-                            <div
-                              className={`vote-fill ${
-                                vote.digit === result.digit
-                                  ? "winner"
-                                  : ""
-                              }`}
-                              style={{
-                                width: `${vote.percentage}%`,
-                              }}
-                            />
-                          </div>
-
-                          <span className="vote-value">
-                            {Math.round(vote.percentage)}%
-                          </span>
-                        </div>
-                      ))}
+                      <p className="processed-preview-caption">
+                        Centered grayscale image used by the KNN classifier.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="processed-preview-empty">
+                      <Fingerprint size={25} />
+                      <strong>Preview unavailable</strong>
+                      <span>
+                        Draw a digit and click Predict Digit.
+                      </span>
                     </div>
-                  </div>
-
-                  <div className="neighbor-gallery">
-                    <div className="neighbor-gallery-heading">
-                      <strong>
-                        Actual {result.k} nearest MNIST neighbours
-                      </strong>
-
-                      <span>Closest training examples</span>
-                    </div>
-
-                    <div className="neighbor-grid">
-                      {result.neighbors.map((neighbor, index) => (
-                        <div
-                          className="neighbor-item"
-                          key={`${neighbor.index}-${index}`}
-                        >
-                          <NeighborThumbnail pixels={neighbor.image} />
-
-                          <strong>
-                            Digit {neighbor.label}
-                          </strong>
-
-                          <span>
-                            #{index + 1} neighbour
-                          </span>
-
-                          <small>
-                            Distance:{" "}
-                            {Math.sqrt(neighbor.distance).toFixed(2)}
-                          </small>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="result-empty">
-                  <div className="result-empty-icon">
-                    <Fingerprint size={25} />
-                  </div>
-
-                  <strong>No prediction yet</strong>
-
-                  <span>
-                    Draw a digit and select Predict Digit to classify it
-                    using KNN.
-                  </span>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Inline status and error messages */}
+            {message && (
+              <div className="recognition-message" role="status">
+                <CircleHelp size={16} />
+                {message}
+              </div>
+            )}
+
+            {/* Single digit prediction button */}
+            {taskMode === "single" && (
+              <button
+                type="button"
+                className="predict-button"
+                onClick={handlePrediction}
+                disabled={predicting}
+              >
+                {predicting ? (
+                  <>
+                    <span className="loading-spinner" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={17} />
+                    Predict Digit
+                    <ArrowRight size={17} />
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Single digit KNN result */}
+            {taskMode === "single" && (
+              <div className="result-card">
+                <div className="result-heading">
+                  <div>
+                    <h3>Prediction result</h3>
+                    <p>Your KNN classification output</p>
+                  </div>
+
+                  <span className="result-demo-tag">REAL KNN</span>
+                </div>
+
+                {predicting ? (
+                  <div className="result-empty">
+                    <div className="loading-spinner large-spinner" />
+
+                    <strong>Analyzing your handwriting</strong>
+
+                    <span>
+                      Comparing your drawing with MNIST training examples.
+                    </span>
+                  </div>
+                ) : result ? (
+                  <>
+                    <div className="result-content">
+                      <div className="result-digit">
+                        <span>Predicted digit</span>
+                        <strong>{result.digit}</strong>
+                        <small>Actual KNN prediction</small>
+                      </div>
+
+                      <div className="result-votes">
+                        <div className="vote-title">
+                          <strong>Nearest-neighbor votes</strong>
+                          <span>{result.k} neighbors</span>
+                        </div>
+
+                        {sortedVotes.map((vote) => (
+                          <div className="vote-row" key={vote.digit}>
+                            <span className="vote-digit">
+                              {vote.digit}
+                            </span>
+
+                            <div className="vote-track">
+                              <div
+                                className={`vote-fill ${
+                                  vote.digit === result.digit
+                                    ? "winner"
+                                    : ""
+                                }`}
+                                style={{
+                                  width: `${vote.percentage}%`,
+                                }}
+                              />
+                            </div>
+
+                            <span className="vote-value">
+                              {Math.round(vote.percentage)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="neighbor-gallery">
+                      <div className="neighbor-gallery-heading">
+                        <strong>
+                          Actual {result.k} nearest MNIST neighbours
+                        </strong>
+
+                        <span>Closest training examples</span>
+                      </div>
+
+                      <div className="neighbor-grid">
+                        {result.neighbors.map((neighbor, index) => (
+                          <div
+                            className="neighbor-item"
+                            key={`${neighbor.index}-${index}`}
+                          >
+                            <NeighborThumbnail pixels={neighbor.image} />
+
+                            <strong>
+                              Digit {neighbor.label}
+                            </strong>
+
+                            <span>
+                              #{index + 1} neighbour
+                            </span>
+
+                            <small>
+                              Distance:{" "}
+                              {Math.sqrt(neighbor.distance).toFixed(2)}
+                            </small>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="result-empty">
+                    <div className="result-empty-icon">
+                      <Fingerprint size={25} />
+                    </div>
+
+                    <strong>No prediction yet</strong>
+
+                    <span>
+                      Draw a digit and select Predict Digit to classify it
+                      using KNN.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
+          {/* Information sidebar */}
           <aside className="recognition-sidebar">
             <div className="guide-card">
               <div className="guide-icon">
@@ -1057,41 +1371,80 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
 
               <h3>How to use the studio</h3>
 
-              <div className="guide-steps">
-                <div className="guide-step">
-                  <span>01</span>
+              {taskMode === "single" ? (
+                <div className="guide-steps">
+                  <div className="guide-step">
+                    <span>01</span>
 
-                  <div>
-                    <strong>Draw a digit</strong>
-                    <p>
-                      Write one number from 0 to 9 on the canvas.
-                    </p>
+                    <div>
+                      <strong>Draw a digit</strong>
+                      <p>
+                        Write one number from 0 to 9 on the canvas.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="guide-step">
+                    <span>02</span>
+
+                    <div>
+                      <strong>Run prediction</strong>
+                      <p>
+                        KNN compares your drawing with 5,000 training images.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="guide-step">
+                    <span>03</span>
+
+                    <div>
+                      <strong>Explore the output</strong>
+                      <p>
+                        Review the predicted digit and actual neighbor
+                        voting results.
+                      </p>
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <div className="guide-steps">
+                  <div className="guide-step">
+                    <span>01</span>
 
-                <div className="guide-step">
-                  <span>02</span>
+                    <div>
+                      <strong>Draw three symbols</strong>
+                      <p>
+                        Write a digit, an operator and another digit.
+                      </p>
+                    </div>
+                  </div>
 
-                  <div>
-                    <strong>Run prediction</strong>
-                    <p>
-                      KNN compares your drawing with 5,000 training images.
-                    </p>
+                  <div className="guide-step">
+                    <span>02</span>
+
+                    <div>
+                      <strong>Extract symbols</strong>
+                      <p>
+                        The segmentation process identifies and prepares
+                        the three symbols.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="guide-step">
+                    <span>03</span>
+
+                    <div>
+                      <strong>Evaluate expression</strong>
+                      <p>
+                        KNN recognizes the digits, operator recognition
+                        identifies the operation, and the result is calculated.
+                      </p>
+                    </div>
                   </div>
                 </div>
-
-                <div className="guide-step">
-                  <span>03</span>
-
-                  <div>
-                    <strong>Explore the output</strong>
-                    <p>
-                      Review the predicted digit and actual neighbor
-                      voting results.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="knn-info-card">
@@ -1103,9 +1456,9 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
               <h3>K-Nearest Neighbors</h3>
 
               <p>
-                KNN classifies your handwriting by comparing its pixel
-                values with labelled MNIST examples and selecting the
-                majority class among the nearest neighbors.
+                KNN classifies handwriting by comparing pixel values with
+                labelled MNIST examples and selecting the majority class
+                among the nearest neighbors.
               </p>
 
               <div className="knn-facts">
@@ -1121,7 +1474,9 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
 
                 <div>
                   <span>K value</span>
-                  <strong>{kValue}</strong>
+                  <strong>
+                    {taskMode === "single" ? kValue : "1 per digit"}
+                  </strong>
                 </div>
 
                 <div>
@@ -1140,8 +1495,9 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
                 <strong>Drawing tip</strong>
 
                 <p>
-                  Use a single bold digit, keep it near the center,
-                  and avoid drawing multiple numbers together.
+                  {taskMode === "single"
+                    ? "Use a single bold digit, keep it near the center, and avoid drawing multiple numbers together."
+                    : "Keep all three symbols separate, draw them from left to right, and leave enough space between them."}
                 </p>
               </div>
             </div>
@@ -1149,6 +1505,7 @@ console.log("EXPRESSION DIGIT PREDICTIONS:", {
         </div>
       )}
 
+      {/* Studio disclaimer */}
       <div className="disclaimer recognition-disclaimer">
         <CheckCircle2 size={15} />
 

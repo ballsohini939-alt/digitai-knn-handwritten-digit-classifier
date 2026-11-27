@@ -63,3 +63,50 @@ const closestByDigit = Array.from({ length: 10 }, (_, digit) =>
   k,
 };
 }
+
+export function predictDigitWeighted(inputPixels, dataset, k = 5) {
+  const { images, labels, imageCount } = dataset;
+
+  if (!inputPixels || inputPixels.length !== 784) {
+    throw new Error("Input must contain exactly 784 pixels.");
+  }
+
+  const distances = [];
+
+  for (let i = 0; i < imageCount; i++) {
+    let distance = 0;
+    const offset = i * 784;
+
+    for (let j = 0; j < 784; j++) {
+      const difference = inputPixels[j] - images[offset + j];
+      distance += difference * difference;
+    }
+
+    distances.push({
+      distance,
+      label: labels[i],
+      index: i,
+    });
+  }
+
+  distances.sort((a, b) => a.distance - b.distance);
+
+  const nearestNeighbors = distances.slice(0, k);
+  const weightedVotes = Array(10).fill(0);
+
+  nearestNeighbors.forEach((neighbor) => {
+    const weight = 1 / (Math.sqrt(neighbor.distance) + 1);
+    weightedVotes[neighbor.label] += weight;
+  });
+
+  const predictedDigit = weightedVotes.indexOf(
+    Math.max(...weightedVotes)
+  );
+
+  return {
+    predictedDigit,
+    weightedVotes,
+    neighbors: nearestNeighbors,
+    k,
+  };
+}
